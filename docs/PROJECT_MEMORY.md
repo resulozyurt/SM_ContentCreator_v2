@@ -5,7 +5,7 @@
 > has been decided, what is built, and what comes next — without losing context.
 > **Every stage must update this file** (status table + changelog + next steps).
 
-_Last updated: 2026-08-05 — end of Phase 0 (repo skeleton)._
+_Last updated: 2026-08-05 — end of Phase 1 (database layer)._
 
 ---
 
@@ -90,8 +90,8 @@ Crawl (infra) → Walk (end-to-end drafting) → Run (live + automation).
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 0 | Repo skeleton, structure, `.env.example`, README, config, boot | ✅ DONE |
-| 1 | DB models + Alembic migrations (pipeline/status table) | ⬜ next |
-| 2 | Model-agnostic AI provider layer (Claude / Gemini / OpenAI) | ⬜ |
+| 1 | DB models + Alembic migrations (pipeline/status table) | ✅ DONE |
+| 2 | Model-agnostic AI provider layer (Claude / Gemini / OpenAI) | ⬜ next |
 | 3 | Copy service: headline + description variants (brand-aware) | ⬜ |
 | 4 | Image service: branded image + write to Drive review folder | ⬜ |
 | 5 | Trend ingestion + monthly calendar draft + cron | ⬜ |
@@ -105,7 +105,25 @@ Crawl (infra) → Walk (end-to-end drafting) → Run (live + automation).
 
 ---
 
-## 5. What exists right now (end of Phase 0)
+## 4a. Pipeline status state machine (Phase 1)
+
+Lives on `calendar_slots.status` (the content item is the source of truth):
+
+```
+draft -> calendar_approved -> copy_selected -> image_review -> approved -> published
+                       \___________ rejected (from any checkpoint) ___________/
+```
+
+- `draft` → seeded from a trend or added manually; awaiting calendar approval.
+- `calendar_approved` → HUMAN CHECKPOINT #1 passed; ready for copy generation.
+- `copy_selected` → HUMAN CHECKPOINT #2 passed; a `copy_variant.is_selected` is set.
+- `image_review` → image generated, sitting in the Drive review folder.
+- `approved` → HUMAN CHECKPOINT #3 passed; ready for manual Canva + publish.
+- `published` → posted (recorded manually). `rejected` → dropped.
+
+Assets have their own `AssetStatus`: review → approved → rejected.
+
+## 5. What exists right now (end of Phase 1)
 
 ```
 app/
@@ -121,33 +139,57 @@ app/
     __init__.py
     base.py              TextProvider / ImageProvider ABCs (contracts only)
   services/__init__.py   stage map (stubs, implemented phases 3–5)
-  db/__init__.py         stub (phase 1)
+  db/
+    __init__.py
+    base.py              Base + enums (Brand, Solution, PipelineStatus, AssetStatus)
+    models.py            Trend, CalendarSlot, CopyVariant, Asset
+    session.py           lazy engine + session_scope() (psycopg v3)
+    migrations/          Alembic (env.py, script.py.mako, versions/)
+      versions/f821b6f74a13_initial_pipeline_schema.py
   admin/__init__.py      stub (phase 6)
   jobs/__init__.py       stub (phase 5/7)
 config/trend_sources.yaml  structure only (phase 5)
 assets/reference/README.md brand asset layout
+alembic.ini
 .env.example · .gitignore · requirements.txt · Procfile · railway.json · runtime.txt
 README.md · docs/PROJECT_MEMORY.md
 ```
 
-Verified: FastAPI app imports and `/health` responds `{status: ok}`.
+Verified:
+- Phase 0: FastAPI app imports and `/health` responds `{status: ok}`.
+- Phase 1: models import; migration renders correct **Postgres** DDL offline
+  (`alembic upgrade head --sql`) — each enum type created exactly once (the
+  shared-enum duplicate-CREATE-TYPE trap is handled by hand-editing the
+  migration to create enums explicitly with checkfirst); downgrade drops tables
+  then types cleanly. Real Postgres run happens on Railway in Phase 7
+  (couldn't install a local Postgres in the sandbox — no root).
 
 ---
 
 ## 6. Next step
 
-**Phase 1 — Database layer.** Design and implement the pipeline/status schema
-(`brands`, `solutions` enum, `calendar_slots`, `copy_variants`, `assets`, with a
-`status` state machine), SQLAlchemy models, session, and Alembic migrations.
-Wait for user approval before starting (per the step-by-step approval rule).
+**Phase 2 — Model-agnostic AI provider layer.** Implement concrete providers
+behind the interfaces in `app/providers/base.py`:
+- `claude.py` — TextProvider (Anthropic API), model from `CLAUDE_TEXT_MODEL`.
+- `gemini.py` — ImageProvider (Gemini `gemini-3-pro-image`), primary.
+- `openai_image.py` — ImageProvider (OpenAI `gpt-image`), fallback.
+- a small factory that returns the configured provider, so swapping a model =
+  one config change. Add deps: `anthropic`, `google-genai`, `openai`.
+Wait for user approval before starting (step-by-step approval rule).
 
-Open item to confirm at Phase 1: exact status state machine values
-(e.g. draft → calendar_approved → copy_selected → image_review → approved).
+Reminder: run `alembic upgrade head` against Railway Postgres during Phase 7.
 
 ---
 
 ## 7. Changelog
 
+- **2026-08-05 — Phase 1.** Database layer: `db/base.py` (Base + 4 enums),
+  `db/models.py` (Trend, CalendarSlot, CopyVariant, Asset), lazy `db/session.py`,
+  Alembic (`alembic.ini`, `env.py` reading DATABASE_URL from settings,
+  `script.py.mako`, initial migration `f821b6f74a13`). Status state machine
+  defined on `calendar_slots.status`. Fixed the shared-enum duplicate CREATE TYPE
+  by hand-editing the migration. Verified Postgres DDL renders correctly offline.
+  Added SQLAlchemy/alembic/psycopg to requirements.
 - **2026-08-05 — Phase 0.** Repo skeleton created: package layout, `config.py`,
   FastAPI boot + `/health`, brand YAML profiles, provider interfaces, `.env.example`,
   `.gitignore`, `requirements.txt`, `Procfile`, `railway.json`, README, this file.

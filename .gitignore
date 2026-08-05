@@ -25,3 +25,7 @@ Thumbs.db
 *.log
 /tmp/
 generated/
+
+# Local SQLite verification DBs
+*.db
+*.db-journal
