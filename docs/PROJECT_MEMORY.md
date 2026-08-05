@@ -5,7 +5,7 @@
 > has been decided, what is built, and what comes next — without losing context.
 > **Every stage must update this file** (status table + changelog + next steps).
 
-_Last updated: 2026-08-05 — end of Phase 2 (AI provider layer)._
+_Last updated: 2026-08-05 — end of Phase 3 (copy service)._
 
 ---
 
@@ -92,8 +92,8 @@ Crawl (infra) → Walk (end-to-end drafting) → Run (live + automation).
 | 0 | Repo skeleton, structure, `.env.example`, README, config, boot | ✅ DONE |
 | 1 | DB models + Alembic migrations (pipeline/status table) | ✅ DONE |
 | 2 | Model-agnostic AI provider layer (Claude / Gemini / OpenAI) | ✅ DONE |
-| 3 | Copy service: headline + description variants (brand-aware) | ⬜ next |
-| 4 | Image service: branded image + write to Drive review folder | ⬜ |
+| 3 | Copy service: headline + description variants (brand-aware) | ✅ DONE |
+| 4 | Image service: branded image + write to Drive review folder | ⬜ next |
 | 5 | Trend ingestion + monthly calendar draft + cron | ⬜ |
 | 6 | Admin panel: 3 approval checkpoints (basic auth) | ⬜ |
 | 7 | Railway deploy: services, cron, secrets, Drive wired, live | ⬜ |
@@ -143,6 +143,9 @@ app/
     openai_image.py      OpenAIImageProvider (gpt-image, fallback)
     factory.py           get_text_provider(), get_image_provider(), FallbackImageProvider
   scripts/smoke_providers.py  manual live test (run with real keys)
+  services/copy.py       Phase 3: build_copy_prompt, generate_variants, select_variant
+tests/test_copy_service.py  4 passing tests (SQLite + fake provider)
+pytest.ini · requirements-dev.txt
   services/__init__.py   stage map (stubs, implemented phases 3–5)
   db/
     __init__.py
@@ -162,11 +165,15 @@ README.md · docs/PROJECT_MEMORY.md
 
 Verified:
 - Phase 0: FastAPI app imports and `/health` responds `{status: ok}`.
+- Phase 3: `pytest` → 4 passing (generate+select happy path, Evatro Turkish
+  instruction, bad-JSON raises, unknown-variant raises). Live end-to-end (real
+  Claude, real slot) happens once the admin panel exists (Phase 6).
 - Phase 2: all providers import; instantiate with keys; missing-key raises a
   clean ProviderError; FallbackImageProvider switches primary->fallback on error.
-  Live API calls NOT run here (need real keys) — verify with
-  `python -m scripts.smoke_providers --all`. The exact `gemini-3-pro-image`
-  response shape should be confirmed on that first live run.
+  Live smoke test PASSED on the user's machine (2026-08-05): Claude returned a
+  headline, Gemini (gemini-3-pro-image) wrote a ~432KB PNG, OpenAI gpt-image
+  wrote a ~1.2MB PNG. So the gemini image response shape (inline_data bytes) is
+  confirmed correct.
 - Phase 1: models import; migration renders correct **Postgres** DDL offline
   (`alembic upgrade head --sql`) — each enum type created exactly once (the
   shared-enum duplicate-CREATE-TYPE trap is handled by hand-editing the
@@ -178,23 +185,31 @@ Verified:
 
 ## 6. Next step
 
-**Phase 3 — Copy service (headline + description).** In `app/services/copy.py`:
-- take an approved `CalendarSlot`, load its `BrandProfile` (voice, language),
-- build a prompt from brand voice + solution context (+ later, liked past posts),
-- call `get_text_provider()` to produce N scroll-stopping headline+description
-  variants, persist them as `CopyVariant` rows (model_used recorded),
-- expose a select action that sets `is_selected` + advances slot status to
-  `copy_selected` and denormalizes the winner onto the slot.
-FieldPie variants in English, Evatro variants in Turkish (brand-driven).
+**Phase 4 — Image service.** In `app/services/image.py`:
+- take a slot with a selected copy variant, load its `BrandProfile`
+  (colors, logo, visual_style, reference images),
+- build an image prompt (headline text + brand color/logo/layout instructions),
+- call `get_image_provider()` (Gemini primary, OpenAI fallback) with the brand
+  reference images,
+- upload the result to the Google Drive review folder
+  (`GOOGLE_DRIVE_REVIEW_FOLDER_ID`), create an `Asset` row (status=review), and
+  advance the slot to `image_review`.
+- Needs a small Google Drive client (deps: google-api-python-client, google-auth)
+  driven by `GOOGLE_DRIVE_CREDENTIALS_JSON`.
 Wait for user approval before starting (step-by-step approval rule).
 
-Reminders: run `alembic upgrade head` on Railway Postgres in Phase 7; confirm
-the live `gemini-3-pro-image` response shape via scripts/smoke_providers.py.
+Reminders: run `alembic upgrade head` on Railway Postgres in Phase 7.
 
 ---
 
 ## 7. Changelog
 
+- **2026-08-05 — Phase 3.** Copy service `app/services/copy.py`:
+  `build_copy_prompt` (brand voice + language + solution context),
+  `_parse_variants` (robust JSON parsing, handles code fences/prose),
+  `generate_variants` (persists CopyVariant rows), `select_variant` (checkpoint
+  #2: sets is_selected, denormalizes winner onto slot, status -> copy_selected).
+  Added `tests/` (4 passing), `pytest.ini`, `requirements-dev.txt`.
 - **2026-08-05 — Phase 2.** Model-agnostic AI provider layer: enriched
   `providers/base.py` (ProviderError, ReferenceImage), `claude.py` (text),
   `gemini.py` (primary image, gemini-3-pro-image), `openai_image.py` (fallback
