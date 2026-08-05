@@ -1,0 +1,38 @@
+# FieldPie brand profile (Global / US)
+# All outputs in native American English. Do not mix with Evatro identity.
+
+key: fieldpie
+name: FieldPie
+language: en-US
+
+# FieldPie serves all six solution areas.
+solutions:
+  - merchandising
+  - field_audit
+  - field_sales
+  - home_service
+  - ai
+  - general
+
+colors:
+  accent: "#0EA5A4"        # teal / petrol green (accent + pill background)
+  heading: "#1E293B"       # dark slate / charcoal (headlines)
+  background: "#FFFFFF"     # white canvas
+  pill_text: "#FFFFFF"     # text inside the teal accent pill
+
+logo_path: assets/reference/fieldpie/logo.png
+reference_set_path: assets/reference/fieldpie/
+
+# Voice / tone prompt handed to the text provider.
+voice_prompt: >
+  Write as FieldPie: clear, confident, trust-building B2B SaaS voice in native
+  American English (never translated-sounding). Use a problem -> solution
+  structure. Headlines are short and scroll-stopping, e.g.
+  "Photos Don't Fix Shelves. Actions Do." Keep it crisp and marketing-focused.
+
+# Visual direction notes (used when composing image prompts in Phase 4).
+extra:
+  visual_style: >
+    Clean modern SaaS aesthetic, generous white space, blend of 3D render and
+    real photography. FieldPie logo top-left. Half-circle "pie" chart motif
+    bottom-left. Accent words sit inside rounded teal pills.

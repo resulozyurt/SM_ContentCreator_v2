@@ -1,0 +1,35 @@
+# Evatro brand profile (Turkey)
+# Content outputs in natural Turkish (never translation-flavored).
+# Do not mix with FieldPie identity.
+
+key: evatro
+name: Evatro
+language: tr-TR
+
+# Evatro focuses mainly on merchandising, audit and AI.
+solutions:
+  - merchandising
+  - field_audit
+  - ai
+
+colors:
+  accent: "#E11D2E"        # red (accent + pill background)
+  heading: "#0B1B3A"       # dark navy / black (block)
+  background: "#FFFFFF"     # white canvas
+  pill_text: "#FFFFFF"     # text inside the red accent pill
+
+logo_path: assets/reference/evatro/logo.png
+reference_set_path: assets/reference/evatro/
+
+# Voice / tone prompt handed to the text provider. Output must be Turkish.
+voice_prompt: >
+  Evatro sesiyle yaz: net, iddialı, doğal ve yerel Türkçe (İngilizce'den çeviri
+  gibi durmayan). "Yeterli değil -> gereken bu" kurgusu kullan. Kısa, dikkat
+  çeken, scroll durduran başlıklar, ör. "Ürün Stokta, Peki Rafta mı?".
+
+# Visual direction notes (used when composing image prompts in Phase 4).
+extra:
+  visual_style: >
+    Top-left navy corner block. "EVATRO" logo bottom-left. Magnifying glass,
+    tablet/phone mockups, shelf/store photography, red accent lines. Accent
+    words sit inside red pills.

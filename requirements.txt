@@ -1,0 +1,14 @@
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Config / validation
+pydantic==2.10.4
+pydantic-settings==2.7.1
+PyYAML==6.0.2
+
+# NOTE: added phase by phase to keep the surface small.
+# Phase 1 (DB):        sqlalchemy, alembic, psycopg[binary]
+# Phase 2 (providers): anthropic, google-genai, openai
+# Phase 4 (storage):   google-api-python-client, google-auth
+# Phase 6 (admin):     jinja2

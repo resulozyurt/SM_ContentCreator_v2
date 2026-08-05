@@ -1,0 +1,11 @@
+# Legitimate trend input sources only (no social-media scraping — ToS risk).
+# RSS feeds, industry news, competitor blogs, Google Trends topics.
+# Populated properly in Phase 5. Structure fixed now.
+
+fieldpie:
+  rss: []          # e.g. industry / competitor blog RSS URLs
+  google_trends: []  # e.g. keyword topics per solution
+
+evatro:
+  rss: []
+  google_trends: []
