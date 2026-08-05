@@ -5,7 +5,7 @@
 > has been decided, what is built, and what comes next — without losing context.
 > **Every stage must update this file** (status table + changelog + next steps).
 
-_Last updated: 2026-08-05 — end of Phase 3 (copy service)._
+_Last updated: 2026-08-05 — end of Phase 4 (image service + Drive storage)._
 
 ---
 
@@ -93,8 +93,8 @@ Crawl (infra) → Walk (end-to-end drafting) → Run (live + automation).
 | 1 | DB models + Alembic migrations (pipeline/status table) | ✅ DONE |
 | 2 | Model-agnostic AI provider layer (Claude / Gemini / OpenAI) | ✅ DONE |
 | 3 | Copy service: headline + description variants (brand-aware) | ✅ DONE |
-| 4 | Image service: branded image + write to Drive review folder | ⬜ next |
-| 5 | Trend ingestion + monthly calendar draft + cron | ⬜ |
+| 4 | Image service: branded image + write to Drive review folder | ✅ DONE |
+| 5 | Trend ingestion + monthly calendar draft + cron | ⬜ next |
 | 6 | Admin panel: 3 approval checkpoints (basic auth) | ⬜ |
 | 7 | Railway deploy: services, cron, secrets, Drive wired, live | ⬜ |
 | 8 | Hardening: error handling, retry/fallback, tests, docs | ⬜ |
@@ -144,7 +144,12 @@ app/
     factory.py           get_text_provider(), get_image_provider(), FallbackImageProvider
   scripts/smoke_providers.py  manual live test (run with real keys)
   services/copy.py       Phase 3: build_copy_prompt, generate_variants, select_variant
-tests/test_copy_service.py  4 passing tests (SQLite + fake provider)
+  services/image.py      Phase 4: build_image_prompt, load_reference_images, generate_image
+  storage/
+    base.py              Storage ABC + StoredFile (swappable backend)
+    drive.py             DriveStorage (service-account upload to review folder)
+tests/test_copy_service.py   4 passing
+tests/test_image_service.py  3 passing (fake provider + fake storage)
 pytest.ini · requirements-dev.txt
   services/__init__.py   stage map (stubs, implemented phases 3–5)
   db/
@@ -165,6 +170,9 @@ README.md · docs/PROJECT_MEMORY.md
 
 Verified:
 - Phase 0: FastAPI app imports and `/health` responds `{status: ok}`.
+- Phase 4: `pytest` → 7 passing total (added image happy-path, precondition,
+  prompt-uses-colors). Live Drive upload + real image gen verified once Google
+  service-account creds + review folder id are set (see setup note below).
 - Phase 3: `pytest` → 4 passing (generate+select happy path, Evatro Turkish
   instruction, bad-JSON raises, unknown-variant raises). Live end-to-end (real
   Claude, real slot) happens once the admin panel exists (Phase 6).
@@ -185,18 +193,21 @@ Verified:
 
 ## 6. Next step
 
-**Phase 4 — Image service.** In `app/services/image.py`:
-- take a slot with a selected copy variant, load its `BrandProfile`
-  (colors, logo, visual_style, reference images),
-- build an image prompt (headline text + brand color/logo/layout instructions),
-- call `get_image_provider()` (Gemini primary, OpenAI fallback) with the brand
-  reference images,
-- upload the result to the Google Drive review folder
-  (`GOOGLE_DRIVE_REVIEW_FOLDER_ID`), create an `Asset` row (status=review), and
-  advance the slot to `image_review`.
-- Needs a small Google Drive client (deps: google-api-python-client, google-auth)
-  driven by `GOOGLE_DRIVE_CREDENTIALS_JSON`.
+**Phase 5 — Trend ingestion + monthly calendar draft.** In `app/services/`:
+- `ingestion.py` — pull from legitimate sources only (RSS feeds, Google Trends
+  topics) per `config/trend_sources.yaml`, store `Trend` rows. No social scraping.
+- `calendar.py` — synthesize trends per solution into a monthly calendar draft:
+  create `CalendarSlot` rows (status=draft) for the month. Human checkpoint #1
+  approves them (a `approve_calendar` action → status=calendar_approved).
+- `jobs/collect_trends.py` — cron entry point (Railway Cron) that runs ingestion.
 Wait for user approval before starting (step-by-step approval rule).
+
+### Google Drive setup (needed for live Phase 4 + Phase 7)
+User must: create a Google Cloud project → enable the Drive API → create a
+service account → download its JSON key → share the target Drive review folder
+with the service-account email → set `GOOGLE_DRIVE_CREDENTIALS_JSON` (path or raw
+JSON) and `GOOGLE_DRIVE_REVIEW_FOLDER_ID` in `.env` / Railway. (Instructions were
+given in chat at end of Phase 4.)
 
 Reminders: run `alembic upgrade head` on Railway Postgres in Phase 7.
 
@@ -204,6 +215,12 @@ Reminders: run `alembic upgrade head` on Railway Postgres in Phase 7.
 
 ## 7. Changelog
 
+- **2026-08-05 — Phase 4.** Image service `app/services/image.py`
+  (build_image_prompt, load_reference_images up to 14, generate_image →
+  upload → Asset(review) → status image_review) and storage layer
+  `app/storage/base.py` (Storage ABC + StoredFile) + `drive.py` (DriveStorage,
+  service-account upload). Added google-api-python-client/google-auth. 3 new
+  tests (7 total passing).
 - **2026-08-05 — Phase 3.** Copy service `app/services/copy.py`:
   `build_copy_prompt` (brand voice + language + solution context),
   `_parse_variants` (robust JSON parsing, handles code fences/prose),
