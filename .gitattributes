@@ -1,0 +1,12 @@
+# Normalize line endings: LF in the repo, so Linux (Railway) never sees CRLF.
+# This silences the "LF will be replaced by CRLF" warnings on Windows.
+* text=auto eol=lf
+
+# Binary assets: never touch line endings.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.pdf binary
+*.db binary

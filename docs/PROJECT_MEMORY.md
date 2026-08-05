@@ -5,7 +5,7 @@
 > has been decided, what is built, and what comes next — without losing context.
 > **Every stage must update this file** (status table + changelog + next steps).
 
-_Last updated: 2026-08-05 — end of Phase 1 (database layer)._
+_Last updated: 2026-08-05 — end of Phase 2 (AI provider layer)._
 
 ---
 
@@ -91,8 +91,8 @@ Crawl (infra) → Walk (end-to-end drafting) → Run (live + automation).
 |-------|-------|--------|
 | 0 | Repo skeleton, structure, `.env.example`, README, config, boot | ✅ DONE |
 | 1 | DB models + Alembic migrations (pipeline/status table) | ✅ DONE |
-| 2 | Model-agnostic AI provider layer (Claude / Gemini / OpenAI) | ⬜ next |
-| 3 | Copy service: headline + description variants (brand-aware) | ⬜ |
+| 2 | Model-agnostic AI provider layer (Claude / Gemini / OpenAI) | ✅ DONE |
+| 3 | Copy service: headline + description variants (brand-aware) | ⬜ next |
 | 4 | Image service: branded image + write to Drive review folder | ⬜ |
 | 5 | Trend ingestion + monthly calendar draft + cron | ⬜ |
 | 6 | Admin panel: 3 approval checkpoints (basic auth) | ⬜ |
@@ -137,7 +137,12 @@ app/
     evatro.yaml          Evatro identity (red/navy, tr-TR, merch/audit/ai)
   providers/
     __init__.py
-    base.py              TextProvider / ImageProvider ABCs (contracts only)
+    base.py              TextProvider / ImageProvider ABCs + ReferenceImage + ProviderError
+    claude.py            ClaudeTextProvider (Anthropic)
+    gemini.py            GeminiImageProvider (gemini-3-pro-image, primary)
+    openai_image.py      OpenAIImageProvider (gpt-image, fallback)
+    factory.py           get_text_provider(), get_image_provider(), FallbackImageProvider
+  scripts/smoke_providers.py  manual live test (run with real keys)
   services/__init__.py   stage map (stubs, implemented phases 3–5)
   db/
     __init__.py
@@ -157,6 +162,11 @@ README.md · docs/PROJECT_MEMORY.md
 
 Verified:
 - Phase 0: FastAPI app imports and `/health` responds `{status: ok}`.
+- Phase 2: all providers import; instantiate with keys; missing-key raises a
+  clean ProviderError; FallbackImageProvider switches primary->fallback on error.
+  Live API calls NOT run here (need real keys) — verify with
+  `python -m scripts.smoke_providers --all`. The exact `gemini-3-pro-image`
+  response shape should be confirmed on that first live run.
 - Phase 1: models import; migration renders correct **Postgres** DDL offline
   (`alembic upgrade head --sql`) — each enum type created exactly once (the
   shared-enum duplicate-CREATE-TYPE trap is handled by hand-editing the
@@ -168,21 +178,31 @@ Verified:
 
 ## 6. Next step
 
-**Phase 2 — Model-agnostic AI provider layer.** Implement concrete providers
-behind the interfaces in `app/providers/base.py`:
-- `claude.py` — TextProvider (Anthropic API), model from `CLAUDE_TEXT_MODEL`.
-- `gemini.py` — ImageProvider (Gemini `gemini-3-pro-image`), primary.
-- `openai_image.py` — ImageProvider (OpenAI `gpt-image`), fallback.
-- a small factory that returns the configured provider, so swapping a model =
-  one config change. Add deps: `anthropic`, `google-genai`, `openai`.
+**Phase 3 — Copy service (headline + description).** In `app/services/copy.py`:
+- take an approved `CalendarSlot`, load its `BrandProfile` (voice, language),
+- build a prompt from brand voice + solution context (+ later, liked past posts),
+- call `get_text_provider()` to produce N scroll-stopping headline+description
+  variants, persist them as `CopyVariant` rows (model_used recorded),
+- expose a select action that sets `is_selected` + advances slot status to
+  `copy_selected` and denormalizes the winner onto the slot.
+FieldPie variants in English, Evatro variants in Turkish (brand-driven).
 Wait for user approval before starting (step-by-step approval rule).
 
-Reminder: run `alembic upgrade head` against Railway Postgres during Phase 7.
+Reminders: run `alembic upgrade head` on Railway Postgres in Phase 7; confirm
+the live `gemini-3-pro-image` response shape via scripts/smoke_providers.py.
 
 ---
 
 ## 7. Changelog
 
+- **2026-08-05 — Phase 2.** Model-agnostic AI provider layer: enriched
+  `providers/base.py` (ProviderError, ReferenceImage), `claude.py` (text),
+  `gemini.py` (primary image, gemini-3-pro-image), `openai_image.py` (fallback
+  image, gpt-image), `factory.py` (get_text_provider / get_image_provider /
+  FallbackImageProvider). SDKs imported lazily so unused providers need no
+  install. Added anthropic/google-genai/openai to requirements. Added
+  `scripts/smoke_providers.py` for live testing with real keys. Also added
+  `.gitattributes` (LF normalization) to stop CRLF warnings.
 - **2026-08-05 — Phase 1.** Database layer: `db/base.py` (Base + 4 enums),
   `db/models.py` (Trend, CalendarSlot, CopyVariant, Asset), lazy `db/session.py`,
   Alembic (`alembic.ini`, `env.py` reading DATABASE_URL from settings,
